@@ -3,6 +3,7 @@ import threading
 import time
 import pygame
 
+# The ImputState Class will hold the current state of the input
 class InputState:
     def __init__(self):
         self.state = 0b0000
@@ -14,6 +15,7 @@ class InputState:
         self.state = newState
 
 def initSerial():
+    # Initialize a serial port at COM3 with 9600 buadrate and a 0.01 timeout timer
     mySerial = serial.Serial()
     mySerial.port = "COM3"
     mySerial.baudrate = 9600
@@ -29,13 +31,18 @@ def exit(mySerial):
 def serial_commands():
     while(True):
         mutex_inputState.acquire()
-        data = inputState.getState()
+        data = inputState.getState() # read the current inputState
         mutex_inputState.release()
 
         mutex.acquire()
 
         if(0b0000 <= int(data) and int(data) <= 0b1111):
-            mySerial.write(data.to_bytes(1, 'little'))
+            try:
+                mySerial.write(data.to_bytes(1, 'little')) # Write the current inputState to the port
+            except:
+                print("Cant write to serial port") # Stop if the thread can't write to the port, will happen on exit
+                mutex.release()
+                break
         mutex.release()
 
 
@@ -44,40 +51,28 @@ def serial_commands():
 def serial_input():
     while(True):
         mutex.acquire()
-        data = mySerial.readline()
+        try:
+            data = mySerial.readline() # read what the micro controller sent
+        except:
+            print("Cant read from serial port") # Stop if the port can't be read, will happen on exit
+            mutex.release()
+            break
         if(data != b''):
-            print(data)
+            print(data) #
         mutex.release()
         
         time.sleep(0.001)
 
-
-mySerial = initSerial()
-mutex = threading.Lock()
-
-inputState = InputState()
-mutex_inputState = threading.Lock()
-
-pygame.init()
-
-# Set up the drawing window
-screen = pygame.display.set_mode([500, 500])
-
-def main():
-
-    thread_command = threading.Thread(target=serial_commands, daemon=True)
-    thread_input = threading.Thread(target=serial_input, daemon=True)
-
-    thread_command.start()
-    thread_input.start()
-
+def window():
     running = True
     while(running):
-        # Did the user click the window close button?
+        # Look for pygame events
         for event in pygame.event.get():
+            # Stop the loop if the user cklicked the window close button
             if event.type == pygame.QUIT:
                 running = False
 
+            # Check for key events and sets the according data in the inputState object
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     mutex_inputState.acquire()
@@ -100,6 +95,7 @@ def main():
                     inputState.setState(state | 0b1000)
                     mutex_inputState.release()
             
+            # Reset the keys inputState if released
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_UP:
                     mutex_inputState.acquire()
@@ -131,8 +127,34 @@ def main():
         # Flip the display
         pygame.display.flip()
 
+
+
+mySerial = initSerial()
+# Lock for the shared serial port
+mutex = threading.Lock()
+
+inputState = InputState()
+# Lock for the shared inputState object
+mutex_inputState = threading.Lock()
+
+pygame.init()
+
+# Set up the drawing window
+screen = pygame.display.set_mode([500, 500])
+
+def main():
+    # Setup a thread that writes to the serial port
+    thread_command = threading.Thread(target=serial_commands, daemon=True)
+    # Setup a thread that read from the serial port
+    thread_input = threading.Thread(target=serial_input, daemon=True)
+
+    thread_command.start()
+    thread_input.start()
+
+    window()
+    
     print("EXIT")
 
-    #exit(mySerial)
+    exit(mySerial)
 
 main()
