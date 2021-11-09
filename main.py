@@ -17,7 +17,7 @@ class InputState:
 def initSerial():
     # Initialize a serial port at COM3 with 9600 buadrate and a 0.01 timeout timer
     mySerial = serial.Serial()
-    mySerial.port = "COM3"
+    mySerial.port = "COM7"
     mySerial.baudrate = 9600
     mySerial.timeout = 0.01
     mySerial.open()
@@ -46,7 +46,7 @@ def serial_commands():
         mutex.release()
 
 
-        time.sleep(0.01)
+        time.sleep(0.001)
 
 def serial_input():
     while(True):
